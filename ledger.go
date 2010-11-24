@@ -8,10 +8,14 @@ import "utf8"
 import "unicode"
 //import "strings"
 import "strconv"
+import "regexp"
 
 type t_account struct {
-    name string
-    fullName string
+    name string // как в файле Траты:Вовка:Стрижка
+    lastname string // Стрижка
+    fullName string //Траты:Вовка:Стрижка:Валюта
+    valuta string // валюта
+    parent *t_account // выше по уровню
 }
 
 type t_ledger_item struct {
@@ -27,12 +31,25 @@ type t_ledger_tran struct {
 
 type t_ledger_file struct {
     Tran []*t_ledger_tran
-    Accounts []*t_account
+    Accounts map[string] *t_account
     curT *t_ledger_tran
     curY int64
     curM int
 }
 
+func (lf *t_ledger_file) findOrCreateAccount(s string) *t_account{
+    var acc *t_account
+    acc = lf.Accounts[s]
+    if acc!=nil {// нашли
+        return acc
+    }
+    r,err := regexp.Compile(":")
+    a := r.FindStringSubmatch(s)
+    println(a,err)
+    // создаем
+    acc = new(t_account)
+    return acc
+}
 
 
 func DecodeDate(s string, dt* time.Time) int { // cлайс на входе
@@ -67,7 +84,7 @@ func (lf *t_ledger_file) ParseTran(s string) *t_ledger_tran{
     lf.curT = new(t_ledger_tran)
     lf.curT.items = make([]*t_ledger_item,0)
     lf.curT.date.Year = lf.curY
-//    lf.curT.date =  new(time.Time)
+    lf.curT.date.Month = lf.curM
     S := utf8.NewString(s)
     var i int
     for i=0; i<S.RuneCount(); i++{
@@ -81,9 +98,29 @@ func (lf *t_ledger_file) ParseTran(s string) *t_ledger_tran{
     lf.Tran = append(lf.Tran,lf.curT)
     return(lf.curT)
 }
+
+func (lf *t_ledger_file) ParseAccount(s string) *t_account{
+    var acc *t_account // вычислить счет найти если нет создать
+    return (acc)
+}
+
+func ParseSumma(s string) int64{
+    S := utf8.NewString(s)
+    var i int
+    for i=0; i<S.RuneCount(); i++{
+        if unicode.IsSpace(S.At(i)){ // конец даты
+            //DecodeDate(S.Slice(0,i), &lf.curT.date)
+            break
+            }
+    }
+    return(0)
+}
+
 func (lf *t_ledger_file) ParseTranItem(s string) *t_ledger_item{
     item := new(t_ledger_item)
     lf.curT.items = append(lf.curT.items,item)
+    item.account = lf.ParseAccount(s) // чистый аккаунт сюда
+    item.summa = ParseSumma(s) // чистая сумма
     return(item)
 }
 
@@ -96,7 +133,7 @@ func ledgerParseFile(fileName string) *t_ledger_file {
     defer f.Close()
     lf := new(t_ledger_file)
     lf.Tran = make([]*t_ledger_tran,0)
-    lf.Accounts = make([]*t_account,0)
+    lf.Accounts = make(map[string]*t_account,0)
     var s string
     //var n int = 1
     fr := bufio.NewReader(f)
@@ -109,6 +146,9 @@ func ledgerParseFile(fileName string) *t_ledger_file {
         }
         if S.At(0)==int('Y') { // текущий год
             lf.curY, err = strconv.Atoi64(S.Slice(1,5))
+        }
+        if S.At(0)==int('M') { // текущий месяц
+            lf.curM, err = strconv.Atoi(S.Slice(1,3))
         }
 
         if unicode.IsDigit(S.At(0)) { // tran begin
@@ -125,8 +165,11 @@ func ledgerParseFile(fileName string) *t_ledger_file {
 }
 
 func main() {
-//        n, err := fmt.Println("hello, world!")
-//        fmt.Println(n, err)
         ledgerParseFile("test.txt")
         println("End")
+        s := "Ghbdtn dctv: n bgf n :juJприВет:34261"
+//        r,err := regexp.Compile(":([123456789]+)")
+        r,err := regexp.Compile(":([a-zA-Z0-9а-яА-Я]+)")
+        a := r.FindString(s)
+        println(a,err)
 }
